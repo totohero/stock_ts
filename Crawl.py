@@ -8,8 +8,8 @@ from pymongo.server_api import ServerApi
 from pymongo.mongo_client import MongoClient
 
 os.environ["MONGO_URI"] = 'mongodb+srv://totohero:86nggolxqPg2kC8G@cluster0-seoul-1st.coz7epy.mongodb.net/?retryWrites=true&w=majority'
-os.environ["START_DATE"] = '2023-01-01'
-os.environ["END_DATE"] = '2023-02-07'
+os.environ["START_DATE"] = '2022-12-01'
+os.environ["END_DATE"] = '2023-02-09'
 
 
 # 86nggolxqPg2kC8G
@@ -82,6 +82,18 @@ def missing_dates(prev_begin: datetime, prev_end: datetime, curr_begin: datetime
     >>> curr_end = datetime(2020, 1, 15)
     >>> missing_dates(prev_begin, prev_end, curr_begin, curr_end)
     [(datetime.datetime(2020, 1, 11, 0, 0), datetime.datetime(2020, 1, 15, 0, 0))]
+    >>> prev_begin = datetime(2020, 1, 10)
+    >>> prev_end = datetime(2020, 1, 15)
+    >>> curr_begin = datetime(2020, 1, 1)
+    >>> curr_end = datetime(2020, 1, 20)
+    >>> missing_dates(prev_begin, prev_end, curr_begin, curr_end)
+    [(datetime.datetime(2020, 1, 5, 0, 0), datetime.datetime(2020, 1, 10, 0, 0)), (datetime.datetime(2020, 1, 16, 0, 0), datetime.datetime(2020, 1, 20, 0, 0))]
+    >>> prev_begin = datetime(2020, 1, 1)
+    >>> prev_end = datetime(2020, 1, 10)
+    >>> curr_begin = datetime(2020, 1, 1)
+    >>> curr_end = datetime(2020, 1, 10)
+    >>> missing_dates(prev_begin, prev_end, curr_begin, curr_end)
+    []
     '''
     if prev_end < curr_begin or curr_end < prev_begin:
         return [(curr_begin, curr_end)]
@@ -105,7 +117,8 @@ def save_stock_ts(symbol, df):
     # DataFrame을 MongoDB에 저장
     df['symbol'] = symbol
     records = df.to_dict(orient='records')
-    stock_ts.insert_many(records)
+    if records:
+        stock_ts.insert_many(records)
 
 
 # 역사상 존재했던 모든 ticker들의 집합
@@ -136,6 +149,7 @@ def crawl_stock_by_date(ticker, begin_date, end_date):
 
 tickers_len = len(tickers)
 
+
 def crawl_stock(begin_date: datetime, end_date: datetime):
     print("Crawl from " + begin_date.strftime('%Y-%m-%d') +
           " to " + end_date.strftime('%Y-%m-%d'))
@@ -158,10 +172,21 @@ def crawl_stock(begin_date: datetime, end_date: datetime):
                   b.strftime('%Y-%m-%d') + " ~ " + e.strftime('%Y-%m-%d'))
             crawl_stock_by_date(ticker, b, e)
 
-        meta.update_one({'name': 'ohlcv_synced_dates'},
-                        {'$addToSet': {'symbol_dates': {'ticker': ticker,
-                                                        'begin': begin_date, 'end': end_date}}},
-                        upsert=True)
+        exist = meta.count_documents(
+            {'name': 'ohlcv_synced_dates', 'symbol_dates.ticker': ticker})
+        if exist:
+            meta.update_one({'name': 'ohlcv_synced_dates', 'symbol_dates.ticker': ticker},
+                            {'$set': {
+                                'symbol_dates.$.begin': begin_date,
+                                'symbol_dates.$.end': end_date
+                            }}, upsert=True)
+        else:
+            meta.update_one({'name': 'ohlcv_synced_dates'}, {
+                            '$push': {'symbol_dates': {
+                                'ticker': ticker,
+                                'begin': begin_date,
+                                'end': end_date
+                            }}}, upsert=True)
         time.sleep(0.1)
     print("Done")
 
