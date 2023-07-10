@@ -8,8 +8,8 @@ from pymongo.server_api import ServerApi
 from pymongo.mongo_client import MongoClient
 
 os.environ["MONGO_URI"] = 'mongodb+srv://totohero:86nggolxqPg2kC8G@cluster0-seoul-1st.coz7epy.mongodb.net/?retryWrites=true&w=majority'
-os.environ["START_DATE"] = '2022-12-01'
-os.environ["END_DATE"] = '2023-02-09'
+os.environ["START_DATE"] = '2022-11-25'
+os.environ["END_DATE"] = '2023-07-09'
 
 
 # 86nggolxqPg2kC8G
@@ -113,14 +113,6 @@ if 'stock_ts' not in db.list_collection_names():
 stock_ts = db['stock_ts']  # 컬렉션(테이블) 선택
 
 
-def save_stock_ts(symbol, df):
-    # DataFrame을 MongoDB에 저장
-    df['symbol'] = symbol
-    records = df.to_dict(orient='records')
-    if records:
-        stock_ts.insert_many(records)
-
-
 # 역사상 존재했던 모든 ticker들의 집합
 tickers = meta.find_one({'name': 'ticker_set'})['tickers']
 
@@ -143,7 +135,20 @@ def crawl_stock_by_date(ticker, begin_date, end_date):
         columns={'날짜': 'date', '시가': 'open', '고가': 'high', '저가': 'low', '종가': 'close', '거래량': 'volume',
                  '거래대금': 'amount',
                  '등락률': 'change'})
-    save_stock_ts(ticker, df)
+    df['symbol'] = ticker
+
+    cap = stock.get_market_cap_by_date(
+        fromdate=begin_date, todate=end_date, ticker=ticker)
+    cap = cap.reset_index()
+    cap = cap.rename(columns={'날짜': 'date', '거래량': 'volume',
+                              '거래대금': 'amount',
+                              '시가총액': 'cap',
+                              '상장주식수': 'shares'})
+
+    # print(pd.merge(df, cap))
+    records = df.to_dict(orient='records')
+    if records:
+        stock_ts.insert_many(records)
     time.sleep(0.1)
 
 
@@ -154,7 +159,7 @@ def crawl_stock(begin_date: datetime, end_date: datetime):
     print("Crawl from " + begin_date.strftime('%Y-%m-%d') +
           " to " + end_date.strftime('%Y-%m-%d'))
     for ind, ticker in enumerate(tickers):
-        print(" (" + str(ind) + "/" + str(tickers_len) + ") " + ticker + ' ', end='')
+        print(" (" + str(ind) + "/" + str(tickers_len) + ") " + ticker)
         try:
             prev_sync = [
                 sd for sd in symbol_dates if sd['ticker'] == ticker][0]
@@ -168,7 +173,7 @@ def crawl_stock(begin_date: datetime, end_date: datetime):
             prev_sync_msg = "no previous sync"
             missing = [(begin_date, end_date)]
         for (b, e) in missing:
-            print(" Fetching OHLCV for " + ticker + " (" + str(ind) + ") " +
+            print(" Fetching OHLCV " +
                   b.strftime('%Y-%m-%d') + " ~ " + e.strftime('%Y-%m-%d'))
             crawl_stock_by_date(ticker, b, e)
 
