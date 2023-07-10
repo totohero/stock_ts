@@ -4,29 +4,11 @@ import pandas as pd
 import time
 from pykrx import stock
 import os
-from pymongo.server_api import ServerApi
-from pymongo.mongo_client import MongoClient
 
-os.environ["MONGO_URI"] = 'mongodb+srv://totohero:86nggolxqPg2kC8G@cluster0-seoul-1st.coz7epy.mongodb.net/?retryWrites=true&w=majority'
+import mydb
+
 os.environ["START_DATE"] = '2022-11-25'
 os.environ["END_DATE"] = '2023-07-09'
-
-
-# 86nggolxqPg2kC8G
-uri = os.environ["MONGO_URI"]
-# Create a new client and connect to the server
-client = MongoClient(uri, server_api=ServerApi('1'))
-# Send a ping to confirm a successful connection
-try:
-    client.admin.command('ping')
-    print("Pinged your deployment. You successfully connected to MongoDB!")
-except Exception as e:
-    print(e)
-
-db = client['stock_db']
-
-meta = db['meta']
-date_collection = db['date']
 
 # Exhaustive crawling of tickers per day
 # Very time-consuming. Use only if necessary
@@ -40,6 +22,8 @@ try:
     global_end_date = datetime.strptime(os.environ['END_DATE'], '%Y-%m-%d')
 except (TypeError, KeyError):
     global_end_date = datetime.today()
+
+db, meta, date_collection = mydb.get_db()
 
 # 일자별 자료 수집 여부 확인
 try:
