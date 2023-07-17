@@ -7,12 +7,9 @@ import os
 
 import mydb
 
-os.environ["START_DATE"] = '2022-11-25'
-os.environ["END_DATE"] = '2023-07-09'
 
-# Exhaustive crawling of tickers per day
-# Very time-consuming. Use only if necessary
-
+# db 및 collection 모음
+db, meta, date_collection, stock_ts = mydb.get_db()
 
 # 자료 수집 시작일
 global_begin_date = datetime.strptime(os.environ['START_DATE'], '%Y-%m-%d')
@@ -22,8 +19,6 @@ try:
     global_end_date = datetime.strptime(os.environ['END_DATE'], '%Y-%m-%d')
 except (TypeError, KeyError):
     global_end_date = datetime.today()
-
-db, meta, date_collection = mydb.get_db()
 
 # 일자별 자료 수집 여부 확인
 try:
@@ -89,14 +84,6 @@ def missing_dates(prev_begin: datetime, prev_end: datetime, curr_begin: datetime
     return missing
 
 
-# stock_ts가 없는 경우, 생성
-if 'stock_ts' not in db.list_collection_names():
-    db.create_collection('stock_ts', timeseries={'timeField': 'date', 'metaField': 'symbol',
-                                                 'granularity': 'hours'})
-
-stock_ts = db['stock_ts']  # 컬렉션(테이블) 선택
-
-
 # 역사상 존재했던 모든 ticker들의 집합
 tickers = meta.find_one({'name': 'ticker_set'})['tickers']
 
@@ -109,7 +96,6 @@ try:
         'symbol_dates']
 except (TypeError, KeyError):
     symbol_dates = []
-
 
 def crawl_stock_by_date(ticker, begin_date, end_date):
     df = stock.get_market_ohlcv_by_date(
@@ -129,7 +115,7 @@ def crawl_stock_by_date(ticker, begin_date, end_date):
                               '시가총액': 'cap',
                               '상장주식수': 'shares'})
 
-    # print(pd.merge(df, cap))
+    df = pd.merge(df, cap)
     records = df.to_dict(orient='records')
     if records:
         stock_ts.insert_many(records)
@@ -143,6 +129,8 @@ def crawl_stock(begin_date: datetime, end_date: datetime):
     print("Crawl from " + begin_date.strftime('%Y-%m-%d') +
           " to " + end_date.strftime('%Y-%m-%d'))
     for ind, ticker in enumerate(tickers):
+        # if ticker != '005930':
+        #    continue
         print(" (" + str(ind) + "/" + str(tickers_len) + ") " + ticker)
         try:
             prev_sync = [
@@ -161,23 +149,25 @@ def crawl_stock(begin_date: datetime, end_date: datetime):
                   b.strftime('%Y-%m-%d') + " ~ " + e.strftime('%Y-%m-%d'))
             crawl_stock_by_date(ticker, b, e)
 
-        exist = meta.count_documents(
+        update_sync_status(begin_date, end_date, ticker)
+    print("Done")
+
+def update_sync_status(begin_date, end_date, ticker):
+    exist = meta.count_documents(
             {'name': 'ohlcv_synced_dates', 'symbol_dates.ticker': ticker})
-        if exist:
-            meta.update_one({'name': 'ohlcv_synced_dates', 'symbol_dates.ticker': ticker},
+    if exist:
+        meta.update_one({'name': 'ohlcv_synced_dates', 'symbol_dates.ticker': ticker},
                             {'$set': {
                                 'symbol_dates.$.begin': begin_date,
                                 'symbol_dates.$.end': end_date
                             }}, upsert=True)
-        else:
-            meta.update_one({'name': 'ohlcv_synced_dates'}, {
+    else:
+        meta.update_one({'name': 'ohlcv_synced_dates'}, {
                             '$push': {'symbol_dates': {
                                 'ticker': ticker,
                                 'begin': begin_date,
                                 'end': end_date
                             }}}, upsert=True)
-        time.sleep(0.1)
-    print("Done")
 
 
 # 일단 시작일, 종료일 기준 모두 수집
