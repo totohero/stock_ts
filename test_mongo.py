@@ -4,7 +4,8 @@ import pandas as pd
 
 db, meta, date_collection, stock_ts = mydb.get_db()
 
-symbol = "005930"
+# symbol = "005930"
+symbol = "003000"
 data = list(stock_ts.find({'symbol': symbol}))
 
 # Assuming you have the OHLCV data in a variable called `df`
