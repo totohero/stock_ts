@@ -5,6 +5,7 @@ import csv
 import pandas as pd
 from pykrx import stock
 from datetime import datetime, timedelta
+import sqlite3
 
 def get_tickers_for_year(year):
     ticker_filename = f"cache/tickers_{year}.pkl"
@@ -24,12 +25,14 @@ def get_stock_prices(ticker, start_date, end_date):
     price_filename = f"cache/{ticker}_{start_date}_{end_date}.pkl"
     if os.path.exists(price_filename):
         with open(price_filename, "rb") as f:
-            df = pickle.load(f)
+            df = pickle.load(f)        
+        print(f"Fetch from cached stock price of {ticker} is done. Number of rows fetched: {len(df)}")
     else:
         df = stock.get_market_ohlcv_by_date(start_date, end_date, ticker)
         os.makedirs(os.path.dirname(price_filename), exist_ok=True)
         with open(price_filename, "wb") as f:
             pickle.dump(df, f)
+        print(f"Fetch from pykrx stock price of {ticker} is done. Number of rows fetched: {len(df)}")
         time.sleep(1)
     return df
 
@@ -62,19 +65,36 @@ with open("tickers.csv", "w") as f:
 end_date = end_date.strftime('%Y%m%d')
 start_date = start_date.strftime('%Y%m%d')
 
-# Create a list to store the stock price data
-all_prices = []
+# ...
+# Connect to the SQLite database
+conn = sqlite3.connect('stock_prices.db')
+
+# Create a cursor object
+cur = conn.cursor()
+
+# Create the prices table if it doesn't exist
+cur.execute('''CREATE TABLE IF NOT EXISTS prices
+               (ticker TEXT, date TEXT, high REAL, low REAL, open REAL, close REAL, volume INTEGER, transact INTEGER, rate REAL, PRIMARY KEY (ticker, date))''')
 
 # Loop over all tickers and fetch the stock price data
 for ticker in tickers_list:
     df = get_stock_prices(ticker, start_date, end_date)
     df['ticker'] = ticker  # Add a column for the ticker
-    all_prices.append(df)
-    print(f"Fetch stock price of {ticker} is done.")
+    
+    # Convert the DataFrame to a list of tuples
+    data = df.reset_index().values.tolist()
+    
+    # Loop over the data
+    for row in data:
+        # Convert the date to a string
+        row[0] = row[0].strftime('%Y%m%d')
+        
+        # Insert the data into the prices table only if it doesn't exist
+        cur.execute('''INSERT OR IGNORE INTO prices (date, high, low, open, close, volume, transact, rate, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', tuple(row))
+        
+        # Commit the transaction
+        conn.commit()
 
-# Concatenate all the stock price data into one DataFrame
-all_prices_df = pd.concat(all_prices)
-
-# Save the DataFrame to a CSV file
-os.makedirs('csv', exist_ok=True)
-all_prices_df.to_csv("csv/all_prices.csv")
+# Close the cursor and the connection
+cur.close()
+conn.close()
