@@ -27,12 +27,15 @@ class Backtest:
     def execute_buy(self, df, row, cash):
         investment = self.calculate_investment(cash)
         if row['buy_signal']:
-            if investment > row['close']:
-                return True, investment
+            shares_to_buy = np.floor(investment / row['close'])
+            actual_investment = shares_to_buy * row['close']
+            if shares_to_buy > 0:
+                return True, actual_investment
             else:
-                return True, 0
+                return False, 0
         else:
             return False, 0
+
 
     def execute_sell(self, df, row, entry_price):
         if row['in_trade']:
@@ -58,6 +61,8 @@ class Backtest:
         for date in result_df.index.unique():
             date_df = result_df.loc[date]
             for ticker in date_df['ticker'].unique():
+                if cash <= 100000:
+                    break
                 ticker_df = date_df[date_df['ticker'] == ticker].copy()
                 entry_price = 0.0
                 investment = 0.0
@@ -75,6 +80,7 @@ class Backtest:
                 result_df.loc[(date_df['ticker'] == ticker).index] = ticker_df
             print(f'{date}: Remaining cash is {cash}')
         return result_df, cash
+
 
     def start(self):
         df = self.load_data()
