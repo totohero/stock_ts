@@ -69,32 +69,16 @@ start_date = start_date.strftime('%Y%m%d')
 # Connect to the SQLite database
 conn = sqlite3.connect('stock_prices.db')
 
-# Create a cursor object
-cur = conn.cursor()
-
-# Create the prices table if it doesn't exist
-cur.execute('''CREATE TABLE IF NOT EXISTS prices
-               (ticker TEXT, date TEXT, high REAL, low REAL, open REAL, close REAL, volume INTEGER, transact INTEGER, rate REAL, PRIMARY KEY (ticker, date))''')
-
 # Loop over all tickers and fetch the stock price data
 for ticker in tickers_list:
-    df = get_stock_prices(ticker, start_date, end_date)
+    df = get_stock_prices(ticker, start_date, end_date).rename(
+        columns={'날짜': 'date', '시가': 'open', '고가': 'high', '저가': 'low', '종가': 'close', '거래량': 'volume',
+                 '거래대금': 'transaction_amount',
+                 '등락률': 'fluctuation_rate'})
+    df.index.name = 'date'  # Set the index name
     df['ticker'] = ticker  # Add a column for the ticker
     
-    # Convert the DataFrame to a list of tuples
-    data = df.reset_index().values.tolist()
-    
-    # Loop over the data
-    for row in data:
-        # Convert the date to a string
-        row[0] = row[0].strftime('%Y%m%d')
-        
-        # Insert the data into the prices table only if it doesn't exist
-        cur.execute('''INSERT OR IGNORE INTO prices (date, high, low, open, close, volume, transact, rate, ticker) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', tuple(row))
-        
-        # Commit the transaction
-        conn.commit()
+    df.to_sql('prices', conn, if_exists='append')
 
-# Close the cursor and the connection
-cur.close()
+# Close the connection
 conn.close()
