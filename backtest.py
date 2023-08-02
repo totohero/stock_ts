@@ -1,65 +1,55 @@
 import sqlite3
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-import seaborn as sns
+import numpy as np
 
-# Connect to the SQLite database
-conn = sqlite3.connect('stock_prices.db')
+class Backtest:
+    def __init__(self, db_path, preprocess, buy_strategy, sell_strategy, hold_days=None, target_return=None, stop_loss=None):
+        self.conn = sqlite3.connect(db_path)
+        self.preprocess = preprocess
+        self.buy_strategy = buy_strategy
+        self.sell_strategy = sell_strategy
+        self.hold_days = hold_days
+        self.target_return = target_return
+        self.stop_loss = stop_loss
 
-# Read the DataFrame from the SQLite database
-df = pd.read_sql('SELECT * FROM prices', conn)
+    def load_data(self):
+        df = pd.read_sql('SELECT * FROM prices', self.conn)
+        df['date'] = pd.to_datetime(df['date'])
+        df.set_index('date', inplace=True)
+        df = self.preprocess(df)
+        return df
 
-# Convert date to datetime and set it as index
-df['date'] = pd.to_datetime(df['date'])
-# 2022년 이후로만 필터링 (처리 속도)
-# df = df[df['date'] > '2023-01-01']
+    def run(self, df):
+        df['in_trade'] = False
+        df['pnl'] = 0.0
+        df = self.buy_strategy(df)
+        df = self.sell_strategy(df)
+        entry_price = 0.0
+        for i in range(1, len(df)):
+            if df['buy_signal'].iloc[i]:
+                df['in_trade'].iloc[i] = True
+                entry_price = df['close'].iloc[i]
+            elif df['in_trade'].iloc[i-1]:
+                if self.stop_loss is not None and df['low'].iloc[i] / entry_price - 1 <= self.stop_loss:
+                    df['in_trade'].iloc[i] = False
+                    df['pnl'].iloc[i] = self.stop_loss
+                else:
+                    if self.target_return is not None and df['high'].iloc[i] / entry_price - 1 >= self.target_return:
+                        df['in_trade'].iloc[i] = False
+                        df['pnl'].iloc[i] = self.target_return
+                    elif self.hold_days is not None and df['in_trade'].shift(self.hold_days).iloc[i]:
+                        df['in_trade'].iloc[i] = False
+                        df['pnl'].iloc[i] = df['close'].iloc[i] / entry_price - 1
+                    elif df['sell_signal'].iloc[i]:
+                        df['in_trade'].iloc[i] = False
+                        df['pnl'].iloc[i] = df['close'].iloc[i] / entry_price - 1
 
-df.set_index('date', inplace=True)
+        trades = df['in_trade'].sum()
+        print(f'Ticker: {df.name}, Accumulated profit or loss: {df["pnl"].sum() * 100:.2f}% over {trades} trades')
+        return df
 
-# Remove rows where 'open' or 'close' or 'high' or 'low' or 'volume' is zero
-df = df[(df['open'] != 0) & (df['close'] != 0) & (df['high'] != 0) & (df['low'] != 0) & (df['volume'] != 0)]
-df_ticker = df.groupby('ticker')
-
-# Calculate the 5 days and 20 days moving averages for the close prices
-df['MA5'] = df_ticker['close'].rolling(window=5).mean().reset_index(0, drop=True)
-df['MA10'] = df_ticker['close'].rolling(window=10).mean().reset_index(0, drop=True)
-df['MA20'] = df_ticker['close'].rolling(window=20).mean().reset_index(0, drop=True)
-
-def backtest(df):
-    # Define the number of days to hold the stock
-    hold_days = 5
-
-    # Create a column to hold the holding period for each stock
-    df['holding_period'] = 0
-
-    # Create a column to hold the profit or loss for each trade
-    df['pnl'] = 0.0
-
-    # Create a column to hold the status of the trade (whether the stock is currently being held or not)
-    df['in_trade'] = False
-
-    # Iterate over the rows of the DataFrame
-    for i in range(1, len(df)):
-        # If the 5-day moving average crosses above the 10-day moving average, enter a trade
-        if df['MA5'].iloc[i] > df['MA10'].iloc[i] and df['MA5'].iloc[i - 1] < df['MA10'].iloc[i - 1]:
-            df['in_trade'].iloc[i] = True
-            df['holding_period'].iloc[i] = 1
-        # If a trade is ongoing, increment the holding period
-        elif df['in_trade'].iloc[i - 1] and df['holding_period'].iloc[i - 1] < hold_days:
-            df['in_trade'].iloc[i] = True
-            df['holding_period'].iloc[i] = df['holding_period'].iloc[i - 1] + 1
-            # If the holding period is reached, exit the trade and calculate the profit or loss
-            if df['holding_period'].iloc[i] == hold_days:
-                df['pnl'].iloc[i] = df['close'].iloc[i] / df['close'].iloc[i - hold_days + 1] - 1
-                # print(f'Ticker: {df.name}, Buy on {df.index[i - hold_days + 1]} and sell on {df.index[i]}, Profit or loss: {df["pnl"].iloc[i] * 100:.2f}%')
-    trades = df['in_trade'].sum()
-    print(f'Ticker: {df.name}, Backtesting completed. Accumulated profit or loss: {df["pnl"].sum() * 100:.2f}% over {trades} trades')
-    return df
-
-# Group by ticker and apply the backtest function
-df = df_ticker.apply(backtest)
-
-# Calculate the total profit or loss
-total_pnl = df['pnl'].sum()
-print(f'Total profit or loss: {total_pnl * 100:.2f}%')
+    def start(self):
+        df = self.load_data()
+        df = df.groupby('ticker').apply(self.run)
+        total_pnl = df['pnl'].sum()
+        print(f'Total profit or loss: {total_pnl * 100:.2f}%')
