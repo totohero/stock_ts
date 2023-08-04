@@ -67,7 +67,7 @@ start_date = start_date.strftime('%Y%m%d')
 
 # ...
 # Connect to the SQLite database
-# conn = sqlite3.connect('stock_prices.db')
+conn = sqlite3.connect('stock_prices.db')
 conn2023 = sqlite3.connect('stock_prices-2023.db')
 
 # Loop over all tickers and fetch the stock price data
@@ -79,9 +79,10 @@ for ticker in tickers_list:
     df.index.name = 'date'  # Set the index name
     df['ticker'] = ticker  # Add a column for the ticker
     
-    # df.to_sql('prices', conn, if_exists='append')
-    df[df.index >= '20230101'].to_sql('prices', conn2023, if_exists='append')
+    df.to_sql('prices', conn, if_exists='replace')
+    df[df.index >= '20230101'].to_sql('prices', conn2023, if_exists='replace')
+
 
 # Close the connection
-# conn.close()
+conn.close()
 conn2023.close()

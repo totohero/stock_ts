@@ -14,18 +14,19 @@ class Backtest:
         self.hold_days = hold_days
         self.target_return = target_return
         self.stop_loss = stop_loss
-        self.begin_date = pd.to_datetime(begin_date)
-        self.end_date = pd.to_datetime(end_date)
+        self.begin_date = begin_date
+        self.end_date = end_date
         self.transaction_cost = transaction_cost
 
     def load_data(self):
         conn = sqlite3.connect(self.db_path)
-        df = pd.read_sql('SELECT * FROM prices', conn)
+        df = pd.read_sql("SELECT * FROM prices", conn)
         conn.close()
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date', inplace=True)
         if self.begin_date is not None and self.end_date is not None:
-            mask = (df.index >= self.begin_date) & (df.index <= self.end_date)
+            mask = (df.index >= pd.to_datetime(self.begin_date)) & (
+                df.index <= pd.to_datetime(self.end_date))
             df = df.loc[mask]
         df = self.preprocess(df)
         return df
@@ -68,7 +69,8 @@ class Backtest:
             exit_price = row['close']
 
         if sell_signal:
-            exit_return = np.ceil(exit_price * shares * (1 - self.transaction_cost))
+            exit_return = np.ceil(exit_price * shares *
+                                  (1 - self.transaction_cost))
 
         return sell_signal, exit_price, exit_return
 
@@ -77,19 +79,21 @@ class Backtest:
         result_df['pnl'] = 0.0
         result_df = self.buy_strategy(result_df)
         tickers_to_buy = result_df[result_df['buy_signal']].groupby(
-            result_df[result_df['buy_signal']].index)['ticker'].apply(set)
+            result_df[result_df['buy_signal']].index)['ticker'].apply(list)
         result_df = self.sell_strategy(result_df)
 
         holdings = {}
         changes = []
 
-        total_value = cash
-        for date in result_df.index.unique():
+        total_value = max_total_value = cash
+        max_draw_down = 0
+        for date in result_df.index.unique():            
             date_df = result_df.loc[date]
-
             tickers_to_add = {}
             # Buying process
-            for ticker in tickers_to_buy.get(date, set()):
+            tickers_to_buy_today = sorted(tickers_to_buy.get(date, []))
+            print(f'### {date} ### - {len(tickers_to_buy_today)} tickers to buy')
+            for ticker in tickers_to_buy_today:
                 if ticker not in holdings:
                     ticker_df = date_df[date_df['ticker'] == ticker]
 
@@ -102,9 +106,8 @@ class Backtest:
                             tickers_to_add[ticker] = {
                                 'entry_price': row['close'], 'shares': shares, 'investment': investment}
                             # No profit/loss at the moment of buying
-                            changes.append((i, 'pnl', 0))
                             print(
-                                f'{date}: Buying {ticker} at {row["close"]} for {shares} shares investing {investment}')
+                                f'Buying {ticker} at {row["close"]} for {shares} shares investing {investment}')
 
             # Selling process
             tickers_to_remove = set()
@@ -123,33 +126,43 @@ class Backtest:
                         tickers_to_remove.add(ticker)
                         changes.append((i, 'pnl', exit_return - investment))
                         print(
-                            f'{date}: Selling {ticker} at {exit_price} for {shares} shares returning {exit_return} with pnl {exit_return - investment} (ratio: {exit_return / investment * 100 - 100:.2f}%)')
+                            f'Selling {ticker} at {exit_price} for {shares} shares returning {exit_return} with pnl {exit_return - investment} (ratio: {exit_return / investment * 100 - 100:.2f}%)')
 
             # Remove from holdings using set comprehension
             holdings = {ticker: holdings[ticker]
                         for ticker in holdings if ticker not in tickers_to_remove}
             holdings.update(tickers_to_add)  # Add to holdings using update
 
+            total_value = cash
+            # Update total value
             if len(holdings) > 0 or len(tickers_to_add) > 0:
-                # 계산된 현금과 보유 종목의 현재 가치를 합산하여 총자산 계산
-                holdings_value = sum(holdings[ticker]['shares'] * (date_df[date_df['ticker'] == ticker]['close'].iloc[0]
-                                                                   if not date_df[date_df['ticker'] == ticker].empty else 0) for ticker in holdings)
-
-                total_value = cash + holdings_value
-                print(
-                    f'{date}: Remaining cash is {cash}, Total portfolio value is {total_value}')
+                for ticker in holdings:
+                    entry_price = holdings[ticker]["entry_price"]
+                    current_price = date_df[date_df["ticker"] ==
+                                            ticker]["close"].iloc[0] if not date_df[date_df['ticker'] == ticker].empty else 0
+                    print(
+                        f'Holding {ticker} shares: {holdings[ticker]["shares"]}, entry_price: {entry_price}, current_price: {current_price}, rate: {100* current_price / entry_price - 100:.2f}%')
+                    total_value += current_price * holdings[ticker]['shares']
+                print(f'Remaining cash is {cash}, Total portfolio value is {total_value}')
+            max_total_value = max(max_total_value, total_value)
+            draw_down = (max_total_value - total_value) / max_total_value
+            max_draw_down = max(max_draw_down, draw_down)
 
         for idx, column, value in changes:
             result_df.loc[idx, column] = value
 
-        return result_df, cash
+        return result_df, total_value, max_total_value, max_draw_down
 
     def start(self):
         df = self.load_data()
         cash = self.starting_cash
-        df, cash = self.run(df, cash)
-        total_pnl = df['pnl'].sum() / self.starting_cash
-        print(f'Total profit or loss: {total_pnl * 100:.2f}%')
+        df, total_value, max_total_value, max_draw_down = self.run(df, cash)
+        print(f'====================================')
+        print(f'Final total return: {100*total_value/self.starting_cash - 100:.2f}%')
+        print(f'Max total return: {100*max_total_value/self.starting_cash - 100:.2f}%')
+        cagr = (total_value/self.starting_cash)**(252/len(df.index.unique())) - 1
+        print(f'CAGR: {100*cagr:.2f}%')
+        print(f'MDD: {100*max_draw_down:.2f}%')
 
 
 if __name__ == "__main__":
@@ -181,5 +194,5 @@ if __name__ == "__main__":
 
     bt = Backtest('stock_prices.db', preprocess, buy_strategy, sell_strategy,
                   starting_cash, buy_ratio, hold_days, target_return, stop_loss,
-                  begin_date='2023-01-01', end_date='2023-12-31', transaction_cost=0.00015)
+                  begin_date='2023-01-01', end_date='2023-07-01', transaction_cost=0.00015)
     bt.start()
