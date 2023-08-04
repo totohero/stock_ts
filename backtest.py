@@ -54,7 +54,7 @@ class Backtest:
         result_df = df.copy()
         result_df['pnl'] = 0.0
         result_df = self.buy_strategy(result_df)
-        buy_signals = result_df[result_df['buy_signal']].groupby(result_df[result_df['buy_signal']].index)['ticker'].apply(set)
+        tickers_to_buy = result_df[result_df['buy_signal']].groupby(result_df[result_df['buy_signal']].index)['ticker'].apply(set)
         result_df = self.sell_strategy(result_df)
 
         holdings = {}
@@ -63,11 +63,10 @@ class Backtest:
         total_value = cash
         for date in result_df.index.unique():
             date_df = result_df.loc[date]
-            tickers_to_buy = buy_signals.get(date, set())
             
             tickers_to_add = {}
             # Buying process
-            for ticker in tickers_to_buy:
+            for ticker in tickers_to_buy.get(date, set()):
                 if ticker not in holdings:
                     ticker_df = date_df[date_df['ticker'] == ticker]
 
@@ -124,18 +123,18 @@ if __name__ == "__main__":
         return df
 
     def buy_strategy(df):
-        df['buy_signal'] = (df['MA5'] > df['MA10']) & (df['MA5'].shift(1) < df['MA10'].shift(1))
+        df['buy_signal'] = (df['MA5'] > 1.03*df['MA10']) & (df['MA5'].shift(1) < 1.03*df['MA10'].shift(1))
         return df
 
     def sell_strategy(df):
-        df['sell_signal'] = (df['MA5'] < df['MA10']) & (df['MA5'].shift(1) > df['MA10'].shift(1))
+        df['sell_signal'] = (df['MA5'] < 0.97*df['MA10']) & (df['MA5'].shift(1) > 0.97*df['MA10'].shift(1))
         return df
 
     starting_cash = 10000000  # 1000만원
     buy_ratio = 0.1  # 10%
     hold_days = 5
-    target_return = 0.05  # 5%
-    stop_loss = -0.15  # -15%
+    target_return = 0.15  # 15%
+    stop_loss = -0.05  # -5%
 
     bt = Backtest('stock_prices.db', preprocess, buy_strategy, sell_strategy, starting_cash, buy_ratio, hold_days, target_return, stop_loss)
     bt.start()
