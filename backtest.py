@@ -74,78 +74,70 @@ class Backtest:
 
         return sell_signal, exit_price, exit_return
 
+    def trade_a_day(self, date, tickers_to_buy_today, date_df, holdings, cash, total_value):
+        tickers_to_add = {}
+        tickers_to_remove = set()
+        changes = []
+        # Buying process
+        print(f'### {date} ### - {len(tickers_to_buy_today)} tickers to buy')
+        for ticker in tickers_to_buy_today:
+            if ticker not in holdings:
+                ticker_df = date_df[date_df['ticker'] == ticker]
+                for i, row in ticker_df.iterrows():
+                    buy_signal, investment, shares = self.execute_buy(ticker_df, row, total_value)
+                    if buy_signal and investment > 0 and cash >= investment:
+                        cash -= investment
+                        tickers_to_add[ticker] = {'entry_price': row['close'], 'shares': shares, 'investment': investment}
+                        print(
+                                f'Buying {ticker} at {row["close"]} for {shares} shares investing {investment}')
+
+        # Selling process
+        for ticker in list(holdings.keys()):
+            ticker_df = date_df[date_df['ticker'] == ticker]
+            entry_price = shares = holdings[ticker]['entry_price']
+            shares = holdings[ticker]['shares']
+            investment = holdings[ticker]['investment']
+            for i, row in ticker_df.iterrows():
+                sell_signal, exit_price, exit_return = self.execute_sell(ticker_df, row, entry_price, shares)
+                if sell_signal:
+                    cash += exit_return
+                    tickers_to_remove.add(ticker)
+                    print(f'Selling {ticker} at {exit_price} for {shares} shares returning {exit_return} with pnl {exit_return - investment} (ratio: {exit_return / investment * 100 - 100:.2f}%)')
+
+
+        holdings = {ticker: holdings[ticker] for ticker in holdings if ticker not in tickers_to_remove}
+        holdings.update(tickers_to_add)
+
+        return holdings, cash, changes
+
+    def update_total_value_and_drawdown(self, date_df, holdings, cash, max_total_value):
+        total_value = cash
+        for ticker in holdings:
+            entry_price = holdings[ticker]["entry_price"]
+            current_price = date_df[date_df["ticker"] == ticker]["close"].iloc[0] if not date_df[date_df['ticker'] == ticker].empty else 0
+            print(f'Holding {ticker} shares: {holdings[ticker]["shares"]}, entry_price: {entry_price}, current_price: {current_price}, rate: {100* current_price / entry_price - 100:.2f}%')
+            total_value += current_price * holdings[ticker]['shares']
+        print(f'Remaining cash is {cash}, Total portfolio value is {total_value}')
+        max_total_value = max(max_total_value, total_value)
+        draw_down = (max_total_value - total_value) / max_total_value if max_total_value != 0 else 0
+
+        return total_value, max_total_value, draw_down
+
     def run(self, df, cash):
         result_df = df.copy()
-        result_df['pnl'] = 0.0
         result_df = self.buy_strategy(result_df)
-        tickers_to_buy = result_df[result_df['buy_signal']].groupby(
-            result_df[result_df['buy_signal']].index)['ticker'].apply(list)
+        tickers_to_buy = result_df[result_df['buy_signal']].groupby(result_df[result_df['buy_signal']].index)['ticker'].apply(list)
         result_df = self.sell_strategy(result_df)
 
         holdings = {}
-        changes = []
-
         total_value = max_total_value = cash
         max_draw_down = 0
-        for date in result_df.index.unique():            
-            date_df = result_df.loc[date]
-            tickers_to_add = {}
-            # Buying process
+
+        changes = {}
+        for date in result_df.index.unique():
             tickers_to_buy_today = sorted(tickers_to_buy.get(date, []))
-            print(f'### {date} ### - {len(tickers_to_buy_today)} tickers to buy')
-            for ticker in tickers_to_buy_today:
-                if ticker not in holdings:
-                    ticker_df = date_df[date_df['ticker'] == ticker]
-
-                    for i, row in ticker_df.iterrows():
-                        buy_signal, investment, shares = self.execute_buy(
-                            ticker_df, row, total_value)
-                        if buy_signal and investment > 0 and cash >= investment:
-                            cash -= investment
-                            # Save entry price and shares
-                            tickers_to_add[ticker] = {
-                                'entry_price': row['close'], 'shares': shares, 'investment': investment}
-                            # No profit/loss at the moment of buying
-                            print(
-                                f'Buying {ticker} at {row["close"]} for {shares} shares investing {investment}')
-
-            # Selling process
-            tickers_to_remove = set()
-            for ticker in list(holdings.keys()):
-                ticker_df = date_df[date_df['ticker'] == ticker]
-                entry_price = holdings[ticker]['entry_price']
-                shares = holdings[ticker]['shares']
-                investment = holdings[ticker]['investment']
-
-                for i, row in ticker_df.iterrows():
-                    sell_signal, exit_price, exit_return = self.execute_sell(
-                        ticker_df, row, entry_price, shares)
-                    if sell_signal:
-                        cash += exit_return
-                        # Save ticker to remove from holdings
-                        tickers_to_remove.add(ticker)
-                        changes.append((i, 'pnl', exit_return - investment))
-                        print(
-                            f'Selling {ticker} at {exit_price} for {shares} shares returning {exit_return} with pnl {exit_return - investment} (ratio: {exit_return / investment * 100 - 100:.2f}%)')
-
-            # Remove from holdings using set comprehension
-            holdings = {ticker: holdings[ticker]
-                        for ticker in holdings if ticker not in tickers_to_remove}
-            holdings.update(tickers_to_add)  # Add to holdings using update
-
-            total_value = cash
-            # Update total value
-            if len(holdings) > 0 or len(tickers_to_add) > 0:
-                for ticker in holdings:
-                    entry_price = holdings[ticker]["entry_price"]
-                    current_price = date_df[date_df["ticker"] ==
-                                            ticker]["close"].iloc[0] if not date_df[date_df['ticker'] == ticker].empty else 0
-                    print(
-                        f'Holding {ticker} shares: {holdings[ticker]["shares"]}, entry_price: {entry_price}, current_price: {current_price}, rate: {100* current_price / entry_price - 100:.2f}%')
-                    total_value += current_price * holdings[ticker]['shares']
-                print(f'Remaining cash is {cash}, Total portfolio value is {total_value}')
-            max_total_value = max(max_total_value, total_value)
-            draw_down = (max_total_value - total_value) / max_total_value
+            holdings, cash, changes = self.trade_a_day(date, tickers_to_buy_today, result_df.loc[date], holdings, cash, total_value)
+            total_value, max_total_value, draw_down = self.update_total_value_and_drawdown(result_df.loc[date], holdings, cash, max_total_value)
             max_draw_down = max(max_draw_down, draw_down)
 
         for idx, column, value in changes:
@@ -194,5 +186,24 @@ if __name__ == "__main__":
 
     bt = Backtest('stock_prices.db', preprocess, buy_strategy, sell_strategy,
                   starting_cash, buy_ratio, hold_days, target_return, stop_loss,
-                  begin_date='2023-01-01', end_date='2023-07-01', transaction_cost=0.00015)
+                  begin_date='2023-06-01', end_date='2023-07-01', transaction_cost=0.00015)
+    
+    import cProfile
+
+    # Create a Profile object
+    pr = cProfile.Profile()
+
+    # Begin profiling
+    pr.enable()
+    
     bt.start()
+
+    # End profiling
+    pr.disable()
+
+    # Print the profiling stats
+    pr.print_stats(sort='time')
+    pr.dump_stats("my_profile.prof")
+
+    import os
+    os.system("snakeviz my_profile.prof")
