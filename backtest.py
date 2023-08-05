@@ -4,9 +4,10 @@ import numpy as np
 
 
 class Backtest:
-    def __init__(self, db_path, preprocess, buy_strategy, sell_strategy, starting_cash, buy_ratio, hold_days=None, target_return=None, stop_loss=None, begin_date=None, end_date=None, transaction_cost=0.0):
+    def __init__(self, db_path, preprocess, daily_sort, buy_strategy, sell_strategy, starting_cash, buy_ratio, hold_days=None, target_return=None, stop_loss=None, begin_date=None, end_date=None, transaction_cost=0.0):
         self.db_path = db_path
         self.preprocess = preprocess
+        self.daily_sort = daily_sort
         self.buy_strategy = buy_strategy
         self.sell_strategy = sell_strategy
         self.starting_cash = starting_cash
@@ -35,7 +36,7 @@ class Backtest:
         return cash * self.buy_ratio
 
     # returns a tuple of (buy_signal, actual_investment, shares_to_buy)
-    def execute_buy(self, df, row, cash):
+    def execute_buy(self, row, cash):
         investment = self.calculate_investment(cash)
         if row['buy_signal']:
             shares_to_buy = np.floor(
@@ -74,22 +75,20 @@ class Backtest:
 
         return sell_signal, exit_price, exit_return
 
-    def trade_a_day(self, date, tickers_to_buy_today, date_df, holdings, cash, total_value):
+    def trade_a_day(self, date, df_to_buy_today, date_df, holdings, cash, total_value):
         tickers_to_add = {}
         tickers_to_remove = set()
         changes = []
         # Buying process
-        print(f'### {date} ### - {len(tickers_to_buy_today)} tickers to buy')
-        for ticker in tickers_to_buy_today:
-            if ticker not in holdings:
-                ticker_df = date_df[date_df['ticker'] == ticker]
-                for i, row in ticker_df.iterrows():
-                    buy_signal, investment, shares = self.execute_buy(ticker_df, row, total_value)
-                    if buy_signal and investment > 0 and cash >= investment:
-                        cash -= investment
-                        tickers_to_add[ticker] = {'entry_price': row['close'], 'shares': shares, 'investment': investment}
-                        print(
-                                f'Buying {ticker} at {row["close"]} for {shares} shares investing {investment}')
+        print(f'### {date} ### - {len(df_to_buy_today)} tickers to buy')
+        for i, ticker_df in df_to_buy_today.iterrows():
+            if ticker_df['ticker'] not in holdings:
+                buy_signal, investment, shares = self.execute_buy(ticker_df, total_value)
+                if buy_signal and investment > 0 and cash >= investment:
+                    cash -= investment
+                    tickers_to_add[ticker_df['ticker']] = {'entry_price': ticker_df['close'], 'shares': shares, 'investment': investment}
+                    print(
+                            f'Buying {ticker_df["ticker"]} at {ticker_df["close"]} for {shares} shares investing {investment}')
 
         # Selling process
         for ticker in list(holdings.keys()):
@@ -126,7 +125,7 @@ class Backtest:
     def run(self, df, cash):
         result_df = df.copy()
         result_df = self.buy_strategy(result_df)
-        tickers_to_buy = result_df[result_df['buy_signal']].groupby(result_df[result_df['buy_signal']].index)['ticker'].apply(list)
+        df_to_buy = result_df[result_df['buy_signal']]
         result_df = self.sell_strategy(result_df)
 
         holdings = {}
@@ -135,8 +134,8 @@ class Backtest:
 
         changes = {}
         for date in result_df.index.unique():
-            tickers_to_buy_today = sorted(tickers_to_buy.get(date, []))
-            holdings, cash, changes = self.trade_a_day(date, tickers_to_buy_today, result_df.loc[date], holdings, cash, total_value)
+            df_to_buy_today = self.daily_sort(df_to_buy[df_to_buy.index == date])
+            holdings, cash, changes = self.trade_a_day(date, df_to_buy_today, result_df.loc[date], holdings, cash, total_value)
             total_value, max_total_value, draw_down = self.update_total_value_and_drawdown(result_df.loc[date], holdings, cash, max_total_value)
             max_draw_down = max(max_draw_down, draw_down)
 
@@ -167,6 +166,9 @@ if __name__ == "__main__":
         df['MA10'] = df.groupby('ticker')['close'].rolling(
             window=10).mean().reset_index(0, drop=True)
         return df
+    
+    def daily_sort(df):
+        return df.sort_values(by=['ticker', 'date'], ascending=[False, False])
 
     def buy_strategy(df):
         df['buy_signal'] = (df['MA5'] > 1.03*df['MA10']
@@ -184,26 +186,29 @@ if __name__ == "__main__":
     target_return = 0.3  # 30%
     stop_loss = -0.1  # -10%
 
-    bt = Backtest('stock_prices.db', preprocess, buy_strategy, sell_strategy,
+    bt = Backtest('stock_prices.db', preprocess, daily_sort, buy_strategy, sell_strategy,
                   starting_cash, buy_ratio, hold_days, target_return, stop_loss,
-                  begin_date='2023-06-01', end_date='2023-07-01', transaction_cost=0.00015)
+                  begin_date='2022-01-01', end_date='2023-07-01', transaction_cost=0.00015)
     
-    import cProfile
+    if True:
+        bt.start()
+    else:
+        import cProfile
 
-    # Create a Profile object
-    pr = cProfile.Profile()
+        # Create a Profile object
+        pr = cProfile.Profile()
 
-    # Begin profiling
-    pr.enable()
-    
-    bt.start()
+        # Begin profiling
+        pr.enable()
+        
+        bt.start()
 
-    # End profiling
-    pr.disable()
+        # End profiling
+        pr.disable()
 
-    # Print the profiling stats
-    pr.print_stats(sort='time')
-    pr.dump_stats("my_profile.prof")
+        # Print the profiling stats
+        pr.print_stats(sort='time')
+        pr.dump_stats("my_profile.prof")
 
-    import os
-    os.system("snakeviz my_profile.prof")
+        import os
+        os.system("snakeviz my_profile.prof")
