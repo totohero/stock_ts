@@ -39,7 +39,7 @@ def get_stock_prices(ticker, start_date, end_date):
 # Calculate the start and end dates since 2003
 start_date = datetime.strptime('20030101', '%Y%m%d')
 # end_date = datetime.now()
-end_date = datetime.strptime('20230727', '%Y%m%d')
+end_date = datetime.strptime('20230806', '%Y%m%d')
 
 # Calculate the dates
 start_year = start_date.year
@@ -80,7 +80,8 @@ for ticker in tickers_list:
     df['ticker'] = ticker  # Add a column for the ticker
     
     df.to_sql('prices', conn, if_exists='replace')
-    df[df.index >= '20230101'].to_sql('prices', conn2023, if_exists='replace')
+    df[df.index.astype(str) >= '20230101'].to_sql('prices', conn2023, if_exists='replace')
+
 
 
 # Close the connection
