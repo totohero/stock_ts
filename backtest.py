@@ -103,7 +103,6 @@ class Backtest:
                     tickers_to_remove.add(ticker)
                     print(f'Selling {ticker} at {exit_price} for {shares} shares returning {exit_return} with pnl {exit_return - investment} (ratio: {exit_return / investment * 100 - 100:.2f}%)')
 
-
         holdings = {ticker: holdings[ticker] for ticker in holdings if ticker not in tickers_to_remove}
         holdings.update(tickers_to_add)
 

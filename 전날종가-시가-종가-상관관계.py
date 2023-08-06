@@ -1,5 +1,6 @@
 import sqlite3
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # Connect to the SQLite database
 conn = sqlite3.connect('stock_prices.db')
@@ -18,9 +19,6 @@ df.set_index('date', inplace=True)
 df = df[(df['open'] != 0) & (df['close'] != 0) & (df['high'] != 0) & (df['low'] != 0) & (df['volume'] != 0)]
 df_ticker = df.groupby('ticker')
 
-import pandas as pd
-import matplotlib.pyplot as plt
-
 # 가정: df는 'open', 'high', 'low'와 'close' 컬럼을 가진 데이터프레임이며, 
 # 각 행은 하루의 시가(open), 최고가(high), 최저가(low)와 종가(close)를 나타냅니다.
 
@@ -29,7 +27,7 @@ df['open_change'] = (df['open'] - df['prev_close']) / df['prev_close']
 df['high_change'] = 100*(df['high'] - df['open']) / df['open']
 df['low_change'] = 100*(df['low'] - df['open']) / df['open']
 
-# 전날 종가 대비 당일 시가가 3% 이상 하락한 날들을 선택합니다.
+# 전날 종가 대비 당일 시가가 5% 이상 하락한 날들을 선택합니다.
 df_significant_drop = df[df['open_change'] <= -0.05]
 
 # 당일 시가 대비 최고가와 최저가의 변화율의 히스토그램을 그립니다.
