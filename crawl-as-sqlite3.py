@@ -1,10 +1,8 @@
 import pickle
 import os
 import time
-import csv
-import pandas as pd
 from pykrx import stock
-from datetime import datetime, timedelta
+from datetime import datetime
 import sqlite3
 
 def get_tickers_for_year(year):
@@ -54,12 +52,7 @@ for year in range(start_year, end_year + 1):
     tickers.update(year_tickers)
     print(f"Fetch ticker of year {year} is done.")
 
-# Save tickers to a CSV file
 tickers_list = sorted(list(tickers))
-with open("tickers.csv", "w") as f:
-    writer = csv.writer(f)
-    for ticker in tickers_list:
-        writer.writerow([ticker])
 
 # Format the dates in the required format
 end_date = end_date.strftime('%Y%m%d')
@@ -69,6 +62,8 @@ start_date = start_date.strftime('%Y%m%d')
 # Connect to the SQLite database
 conn = sqlite3.connect('stock_prices.db')
 conn2023 = sqlite3.connect('stock_prices-2023.db')
+conn.execute("DROP TABLE IF EXISTS prices;")
+conn2023.execute("DROP TABLE IF EXISTS prices;")
 
 # Loop over all tickers and fetch the stock price data
 for ticker in tickers_list:
@@ -79,9 +74,12 @@ for ticker in tickers_list:
     df.index.name = 'date'  # Set the index name
     df['ticker'] = ticker  # Add a column for the ticker
     
-    df.to_sql('prices', conn, if_exists='replace')
-    df[df.index.astype(str) >= '20230101'].to_sql('prices', conn2023, if_exists='replace')
+    if not df.empty:
+        df.to_sql('prices', conn, if_exists='append')
 
+    df2023 = df[df.index.astype(str) >= '20230101']
+    if not df2023.empty:
+        df2023.to_sql('prices', conn2023, if_exists='append')
 
 
 # Close the connection
