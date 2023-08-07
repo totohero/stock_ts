@@ -37,7 +37,7 @@ def get_stock_prices(ticker, start_date, end_date):
 # Calculate the start and end dates since 2003
 start_date = datetime.strptime('20030101', '%Y%m%d')
 # end_date = datetime.now()
-end_date = datetime.strptime('20230806', '%Y%m%d')
+end_date = datetime.strptime('20230727', '%Y%m%d')
 
 # Calculate the dates
 start_year = start_date.year
