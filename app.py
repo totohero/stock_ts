@@ -1,18 +1,11 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+import load_db
 
-@st.cache_data
-def load_data():
-    conn = sqlite3.connect('stock_prices.db')
-    df = pd.read_sql('SELECT * FROM prices', conn)
-    df['date'] = pd.to_datetime(df['date'])
-    return df
-
-df = load_data()
+df = load_db.load_data()
 
 # Sidebar date selection
 min_date = df['date'].min().date()

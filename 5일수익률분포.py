@@ -18,7 +18,7 @@ def calculate_return(df):
     return df
 
 # Read the DataFrame from the SQLite database
-df = load_db.load_df()
+df = load_db.load_data()
 
 # Convert date to datetime and set it as index
 df['date'] = pd.to_datetime(df['date'])
