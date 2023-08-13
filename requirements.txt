@@ -5,7 +5,5 @@ numpy==1.25.0
 pandas==2.0.3
 plotly==5.15.0
 pykrx==1.0.44
-# Editable install with no version control (pymongo==3.12.0)
--e c:\anaconda3\lib\site-packages\pymongo-3.12.0-py3.10.egg-info
 seaborn==0.12.2
 streamlit==1.23.0
