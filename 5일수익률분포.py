@@ -30,8 +30,8 @@ result_df = df.groupby('ticker').apply(calculate_return)
 result_df = result_df[['ticker', 'date', 'max_return_next_5_days', 'min_return_next_5_days']]
 
 # x, y 축 범위를 정의 (필요에 따라 조정)
-x_bins = np.linspace(-25, 25, 51) # 최고 수익률 범위
-y_bins = np.linspace(-25, 25, 51) # 최저 수익률 범위
+x_bins = np.linspace(-10, 10, 21) # 최고 수익률 범위
+y_bins = np.linspace(-10, 10, 21) # 최저 수익률 범위
 
 # 히트맵을 그릴 데이터 준비 (max_return_next_5_days, min_return_next_5_days)
 heatmap_data = result_df[['max_return_next_5_days', 'min_return_next_5_days']]
@@ -45,8 +45,13 @@ frequency_table = pd.pivot_table(heatmap_data, index='y_bin', columns='x_bin', v
 
 # 히트맵 그리기
 plt.figure(figsize=(10, 8))
-sns.heatmap(frequency_table, cmap='YlGnBu', annot=True, fmt='d')
+sns.heatmap(frequency_table, cmap='YlGnBu', annot=False, fmt='d')
 plt.title('Distribution of Max & Min Returns over the Next 5 Days')
 plt.xlabel('Max Return Next 5 Days')
 plt.ylabel('Min Return Next 5 Days')
-plt.show()
+# plt.show()
+print(frequency_table)
+
+import streamlit as st
+# Streamlit에 플롯 출력
+st.pyplot(plt)
