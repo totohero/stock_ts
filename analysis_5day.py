@@ -19,13 +19,12 @@ def calculate_return(df):
     
     return df
 
-@st.cache_data
 def calculate_frequency(df):
     # 종목별로 위의 함수를 적용
     result_df = df.groupby('ticker').apply(calculate_return)
 
     # 필요한 컬럼만 선택
-    result_df = result_df[['ticker', 'date', 'max_return_next_5_days', 'min_return_next_5_days']]
+    result_df = result_df[['ticker', 'max_return_next_5_days', 'min_return_next_5_days']]
 
     # x, y 축 범위를 정의 (필요에 따라 조정)
     x_bins = np.linspace(-10, 10, 21) # 최고 수익률 범위
