@@ -29,9 +29,9 @@ def doit():
 
     # close_change와 low_change를 빈으로 나눕니다.
     # high_change와 low_change를 빈으로 나눕니다.
-    filtered_df['high_change_bin'] = pd.cut(filtered_df['high_change'], np.linspace(0, 20, 21))
-    filtered_df['low_change_bin'] = pd.cut(filtered_df['low_change'], np.linspace(-20, 0, 21))
-    filtered_df['close_change_bin'] = pd.cut(filtered_df['close_change'], np.linspace(0, 20, 21))
+    filtered_df.loc['high_change_bin'] = pd.cut(filtered_df['high_change'], np.linspace(0, 20, 21))
+    filtered_df.loc['low_change_bin'] = pd.cut(filtered_df['low_change'], np.linspace(-20, 0, 21))
+    filtered_df.loc['close_change_bin'] = pd.cut(filtered_df['close_change'], np.linspace(0, 20, 21))
 
     # 피벗 테이블을 사용하여 빈도를 계산합니다.
     frequency_table = pd.pivot_table(filtered_df, index='low_change_bin', columns='close_change_bin', values='open', aggfunc='count', fill_value=0)
