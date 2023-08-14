@@ -1,14 +1,11 @@
-import sqlite3
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import load_db
 
 def doit():
-    # Connect to the SQLite database
-    conn = sqlite3.connect('stock_prices.db')
-
     # Read the DataFrame from the SQLite database
-    df = pd.read_sql('SELECT * FROM prices', conn)
+    df = load_db.load_data()
 
     # Convert date to datetime and set it as index
     df['date'] = pd.to_datetime(df['date'])
