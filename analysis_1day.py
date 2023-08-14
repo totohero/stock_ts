@@ -35,7 +35,7 @@ def doit():
     frequency_table = pd.pivot_table(filtered_df, index='low_change_bin', columns='close_change_bin', values='open', aggfunc='count', fill_value=0)
 
     # 표를 출력합니다.
-    st.print(frequency_table)
+    st.write(frequency_table)
 
     import seaborn as sns
 
@@ -52,7 +52,7 @@ def doit():
     frequency_table = pd.pivot_table(filtered_df, index='low_change_bin', columns='high_change_bin', values='open', aggfunc='count', fill_value=0)
 
     # 표를 출력합니다.
-    st.print(frequency_table)
+    st.write(frequency_table)
 
 if __name__ == "__main__":
     doit()

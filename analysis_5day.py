@@ -52,7 +52,7 @@ def doit():
     plt.xlabel('Max Return Next 5 Days')
     plt.ylabel('Min Return Next 5 Days')
     # plt.show()
-    print(frequency_table)
+    st.write(frequency_table)
 
     # Streamlit에 플롯 출력
     st.pyplot(plt)
