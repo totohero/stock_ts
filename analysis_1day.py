@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import load_db
 import streamlit as st
+import seaborn as sns
 
 def doit():
     # Read the DataFrame from the SQLite database
@@ -18,8 +19,9 @@ def doit():
     df['prev_close'] = df['close'].shift(1)
     df['prev_close-low'] = (df['low'] - df['prev_close']) / df['prev_close']
     df['buy'] = df['prev_close'] * 0.9
-    df['close_change'] = 100 * (df['close'] - df['buy'] ) / df['buy']
+    df['high_change'] = 100 * (df['high'] - df['buy'] ) / df['buy']
     df['low_change'] = 100 * (df['low'] - df['buy'] ) / df['buy']
+    df['close_change'] = 100 * (df['close'] - df['buy'] ) / df['buy']
     df.dropna(inplace=True)
 
     # 전날 종가 대비 10% 이상 하락한 날들을 선택합니다.
@@ -36,8 +38,6 @@ def doit():
 
     # 표를 출력합니다.
     st.write(frequency_table)
-
-    import seaborn as sns
 
     # 히트맵을 그립니다.
     plt.figure(figsize=(10, 8))
