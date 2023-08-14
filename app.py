@@ -12,4 +12,4 @@ try:
     if st.sidebar.button("5 Day Analysis"):
         analysis_5day.doit()
 except Exception as e:
-    st.error(traceback.format_exc())
+    st.error(e)
