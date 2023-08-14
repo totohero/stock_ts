@@ -6,6 +6,7 @@ import seaborn as sns
 import streamlit as st
 
 # 종목별로 이후 5일간의 최고 수익률과 최저 수익률을 계산하는 함수
+@st.cache_data
 def calculate_return(df):
     # 이후 5일간의 수익률 계산
     next_5_days_returns = [100 * df['close'].pct_change(periods=i).shift(-i) for i in range(1, 6)]
@@ -18,13 +19,8 @@ def calculate_return(df):
     
     return df
 
-def doit():
-    # Read the DataFrame from the SQLite database
-    df = load_db.load_data()
-
-    # Convert date to datetime and set it as index
-    df['date'] = pd.to_datetime(df['date'])
-
+@st.cache_data
+def calculate_frequency(df):
     # 종목별로 위의 함수를 적용
     result_df = df.groupby('ticker').apply(calculate_return)
 
@@ -44,6 +40,13 @@ def doit():
 
     # 피벗 테이블을 사용하여 빈도를 계산합니다.
     frequency_table = pd.pivot_table(heatmap_data, index='y_bin', columns='x_bin', values='max_return_next_5_days', aggfunc='count', fill_value=0)
+    return frequency_table
+
+def doit():
+    # Read the DataFrame from the SQLite database
+    df = load_db.load_data()
+
+    frequency_table = calculate_frequency(df)
 
     # 히트맵 그리기
     plt.figure(figsize=(10, 8))
@@ -56,3 +59,6 @@ def doit():
 
     # Streamlit에 플롯 출력
     st.pyplot(plt)
+
+if __name__ == "__main__":
+    doit()

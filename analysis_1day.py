@@ -5,14 +5,8 @@ import load_db
 import streamlit as st
 import seaborn as sns
 
-def doit():
-    # Read the DataFrame from the SQLite database
-    df = load_db.load_data()
-
-    # Convert date to datetime and set it as index
-    df['date'] = pd.to_datetime(df['date'])
-    df.set_index('date', inplace=True)
-
+@st.cache_data
+def calculate(df):
     # Remove rows where 'open' or 'close' is zero
     df = df[(df['open'] != 0) & (df['close'] != 0) & (df['high'] != 0) & (df['low'] != 0) & (df['volume'] != 0)]
 
@@ -35,7 +29,13 @@ def doit():
 
     # 피벗 테이블을 사용하여 빈도를 계산합니다.
     frequency_table = pd.pivot_table(filtered_df, index='low_change_bin', columns='close_change_bin', values='open', aggfunc='count', fill_value=0)
+    return filtered_df, frequency_table
 
+def doit():
+    # Read the DataFrame from the SQLite database
+    df = load_db.load_data()
+
+    filtered_df, frequency_table = calculate(df)
     # 표를 출력합니다.
     st.write(frequency_table)
 

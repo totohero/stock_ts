@@ -9,5 +9,6 @@ def load_data():
     conn = sqlite3.connect(original_db_path)
     df = pd.read_sql('SELECT * FROM prices', conn)
     df['date'] = pd.to_datetime(df['date'])
+    df.set_index('date', inplace=True)
     return df
 
