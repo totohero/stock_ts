@@ -3,7 +3,6 @@ import os
 import time
 from pykrx import stock
 from datetime import datetime
-import sqlite3
 import pandas as pd
 
 def get_tickers_for_year(market, year):
@@ -60,11 +59,10 @@ def crawl(market, s, e):
     end_date = end_date.strftime('%Y%m%d')
     start_date = start_date.strftime('%Y%m%d')
 
-    # ...
-    # Connect to the SQLite database
-    conn = sqlite3.connect('{market}_stock_prices.db')
+    file_path = '{market}_stock_prices.feather'
+
     try:
-        all_df = pd.read_sql('SELECT * FROM prices', conn)
+        all_df = pd.read_feather(file_path)
     except Exception as e:
         all_df = pd.DataFrame()
         print(e)
@@ -85,11 +83,12 @@ def crawl(market, s, e):
     all_df['date'] = pd.to_datetime(all_df['date'])
     all_df.set_index('date', inplace=True)
 
-    # del all_df['date']
-    all_df.to_sql('prices', conn, if_exists='replace')
+    # 파일이 이미 존재하는 경우 처리
+    if os.path.exists(file_path):
+        file_path = '{market}_stock_prices.new.feather'
 
-    # Close the connection
-    conn.close()
+    # del all_df['date']
+    all_df.to_feather(file_path)
 
 if __name__ == "__main__":
     crawl('KOSDAQ', '20030101', '20230815')

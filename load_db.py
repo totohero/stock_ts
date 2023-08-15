@@ -2,15 +2,13 @@ import sqlite3
 import pandas as pd
 import streamlit as st
 
-db_paths = [ 'KOSPI_stock_prices.db', 'KOSDAQ_stock_prices.db']
+db_paths = [ 'KOSPI_stock_prices.feather', 'KOSDAQ_stock_prices.feather']
 
 @st.cache_data
 def load_data():
     all_df = pd.DataFrame()
     for db_path in db_paths:
-        conn = sqlite3.connect(db_path)
-        df = pd.read_sql('SELECT * FROM prices', conn)    
-        conn.close()
+        df = pd.read_feather(db_path)
         df['date'] = pd.to_datetime(df['date'])
         df.set_index('date', inplace=True)
         all_df = pd.concat([all_df, df])
