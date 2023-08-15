@@ -41,9 +41,9 @@ def calculate_frequency(df):
     frequency_table = pd.pivot_table(heatmap_data, index='y_bin', columns='x_bin', values='max_return_next_5_days', aggfunc='count', fill_value=0)
     return frequency_table
 
-def doit():
+def doit(remote):
     # Read the DataFrame from the SQLite database
-    df = load_db.load_data()
+    df = load_db.load_data(remote)
 
     frequency_table = calculate_frequency(df)
 

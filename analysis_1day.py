@@ -31,9 +31,9 @@ def calculate(df):
     frequency_table = pd.pivot_table(filtered_df, index='low_change_bin', columns='close_change_bin', values='open', aggfunc='count', fill_value=0)
     return filtered_df, frequency_table
 
-def doit():
+def doit(remote):
     # Read the DataFrame from the SQLite database
-    df = load_db.load_data()
+    df = load_db.load_data(remote)
 
     filtered_df, frequency_table = calculate(df)
     # 표를 출력합니다.
