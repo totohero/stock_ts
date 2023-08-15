@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
     bt = Backtest('stock_prices.db', preprocess, daily_sort, buy_strategy, sell_strategy,
                   starting_cash, buy_ratio, hold_days, target_return, stop_loss,
-                  begin_date='2021-01-01', end_date='2023-07-01', transaction_cost=0.00015)
+                  begin_date='2021-01-01', end_date='2023-08-14', transaction_cost=0.00015)
     
     if True:
         bt.start()

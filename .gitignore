@@ -4,3 +4,4 @@ cache/
 *.db
 *.journal
 *.prof
+*.db-journal

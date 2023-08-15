@@ -4,6 +4,7 @@ import time
 from pykrx import stock
 from datetime import datetime
 import sqlite3
+import pandas as pd
 
 def get_tickers_for_year(year):
     ticker_filename = f"cache/tickers_{year}.pkl"
@@ -34,11 +35,11 @@ def get_stock_prices(ticker, start_date, end_date):
         time.sleep(1)
     return df
 
-def crawl():
+def crawl(s, e):
     # Calculate the start and end dates since 2003
-    start_date = datetime.strptime('20030101', '%Y%m%d')
+    start_date = datetime.strptime(s, '%Y%m%d')
     # end_date = datetime.now()
-    end_date = datetime.strptime('20230727', '%Y%m%d')
+    end_date = datetime.strptime(e, '%Y%m%d')
 
     # Calculate the dates
     start_year = start_date.year
@@ -62,9 +63,7 @@ def crawl():
     # ...
     # Connect to the SQLite database
     conn = sqlite3.connect('stock_prices.db')
-    conn2023 = sqlite3.connect('stock_prices-2023.db')
-    conn.execute("DROP TABLE IF EXISTS prices;")
-    conn2023.execute("DROP TABLE IF EXISTS prices;")
+    all_df = pd.read_sql('SELECT * FROM prices', conn)
 
     # Loop over all tickers and fetch the stock price data
     for ticker in tickers_list:
@@ -72,17 +71,21 @@ def crawl():
             columns={'날짜': 'date', '시가': 'open', '고가': 'high', '저가': 'low', '종가': 'close', '거래량': 'volume',
                     '거래대금': 'transaction_amount',
                     '등락률': 'fluctuation_rate'})
-        df.index.name = 'date'  # Set the index name
         df['ticker'] = ticker  # Add a column for the ticker
-        
-        if not df.empty:
-            df.to_sql('prices', conn, if_exists='append')
+        df['date'] = df.index
+        all_df = pd.concat([all_df, df])
 
-        df2023 = df[df.index.astype(str) >= '20230101']
-        if not df2023.empty:
-            df2023.to_sql('prices', conn2023, if_exists='append')
+    # remove duplicates
+    all_df.drop_duplicates(subset=['date', 'ticker'], inplace=True)
+    all_df['date'] = pd.to_datetime(all_df['date'])
+    all_df.set_index('date', inplace=True)
 
+    # del all_df['date']
+    all_df.to_sql('prices', conn, if_exists='replace')
 
     # Close the connection
     conn.close()
-    conn2023.close()
+
+if __name__ == "__main__":
+    crawl('20030101', '20230727')
+    crawl('20230727', '20230815')
