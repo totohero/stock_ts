@@ -6,14 +6,14 @@ from datetime import datetime
 import sqlite3
 import pandas as pd
 
-def get_tickers_for_year(year):
-    ticker_filename = f"cache/tickers_{year}.pkl"
+def get_tickers_for_year(market, year):
+    ticker_filename = f"cache/tickers_{market}_{year}.pkl"
     if os.path.exists(ticker_filename):
         with open(ticker_filename, "rb") as f:
             year_tickers = pickle.load(f)
     else:
         date = f"{year}0101"
-        year_tickers = stock.get_market_ticker_list(date)
+        year_tickers = stock.get_market_ticker_list(date, market=market)
         os.makedirs(os.path.dirname(ticker_filename), exist_ok=True)
         with open(ticker_filename, "wb") as f:
             pickle.dump(year_tickers, f)
@@ -35,7 +35,7 @@ def get_stock_prices(ticker, start_date, end_date):
         time.sleep(1)
     return df
 
-def crawl(s, e):
+def crawl(market, s, e):
     # Calculate the start and end dates since 2003
     start_date = datetime.strptime(s, '%Y%m%d')
     # end_date = datetime.now()
@@ -50,9 +50,9 @@ def crawl(s, e):
 
     # Loop over each year and fetch the tickers
     for year in range(start_year, end_year + 1):
-        year_tickers = get_tickers_for_year(year)
+        year_tickers = get_tickers_for_year(market, year)
         tickers.update(year_tickers)
-        print(f"Fetch ticker of year {year} is done.")
+        print(f"Fetch ticker of {market} in the year {year} is done.")
 
     tickers_list = sorted(list(tickers))
 
@@ -62,8 +62,13 @@ def crawl(s, e):
 
     # ...
     # Connect to the SQLite database
-    conn = sqlite3.connect('stock_prices.db')
-    all_df = pd.read_sql('SELECT * FROM prices', conn)
+    conn = sqlite3.connect('{market}_stock_prices.db')
+    try:
+        all_df = pd.read_sql('SELECT * FROM prices', conn)
+    except Exception as e:
+        all_df = pd.DataFrame()
+        print(e)
+        print('Use empty dataframe')
 
     # Loop over all tickers and fetch the stock price data
     for ticker in tickers_list:
@@ -87,5 +92,4 @@ def crawl(s, e):
     conn.close()
 
 if __name__ == "__main__":
-    crawl('20030101', '20230727')
-    crawl('20230727', '20230815')
+    crawl('KOSDAQ', '20030101', '20230815')
