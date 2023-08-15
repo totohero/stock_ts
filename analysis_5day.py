@@ -19,6 +19,7 @@ def calculate_return(df):
     
     return df
 
+@st.cache_data
 def calculate_frequency(df):
     # 종목별로 위의 함수를 적용
     result_df = df.groupby('ticker').apply(calculate_return)
@@ -60,4 +61,4 @@ def doit(remote):
     st.pyplot(plt)
 
 if __name__ == "__main__":
-    doit()
+    doit(False)
