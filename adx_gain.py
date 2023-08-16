@@ -9,10 +9,12 @@ def plot_adx_vs_max_5day_return(df):
     df['adx'] = talib.ADX(df['high'], df['low'], df['close'])
 
     # Calculate the maximum close price over the next 5 days
-    df['5_day_max_return'] = df['close'].shift(-1).rolling(window=5, min_periods=1).max()
-
-    # Bin ADX values
-    df['adx_bin'] = pd.cut(df['adx'], bins=20)
+    df = df[df['close'] != 0]
+    df.dropna(inplace=True)
+    df['5_day_max_return'] = 100 * df['close'].shift(-1).rolling(window=5, min_periods=1).max() / df['close'] - 100
+    df = df[df['5_day_max_return'] > -50]
+    df = df[df['5_day_max_return'] < 50]
+    df['adx_bin'] = pd.cut(df['adx'], bins=10)
 
     # Calculate mean, variance, and count for each ADX bin
     adx_summary = df.groupby('adx_bin')['5_day_max_return'].agg(mean='mean', var='var', count='count')  # Corrected line
