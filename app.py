@@ -22,9 +22,9 @@ try:
     if st.sidebar.button("5 Day Analysis"):
         analysis_5day.doit(df)
     if st.sidebar.button("RSI - 5 Day Return"):
-        rsi_gain.plot_rsi_vs_max_5day_return(df)
+        rsi_gain.plot_rsi_vs_5day_return(df)
     if st.sidebar.button("ADX - 5 Day Return"):
-        adx_gain.plot_adx_vs_max_5day_return(df)
+        adx_gain.plot_adx_vs_5day_return(df)
 
 except Exception as e:
     st.error(traceback.format_exc())

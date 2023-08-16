@@ -1,37 +1,45 @@
-import talib
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
 import streamlit
+import talib
+import matplotlib.pyplot as plt
 
-def plot_adx_vs_max_5day_return(df):
+def plot_adx_vs_5day_return(df):
     # Calculate ADX
     df['adx'] = talib.ADX(df['high'], df['low'], df['close'])
 
-    # Calculate the maximum close price over the next 5 days
     df = df[df['close'] != 0]
     df.dropna(inplace=True)
+    # Calculate the maximum close price over the next 5 days
     df['5_day_max_return'] = 100 * df['close'].shift(-1).rolling(window=5, min_periods=1).max() / df['close'] - 100
+    
+    # Calculate the minimum close price over the next 5 days
+    df['5_day_min_return'] = 100 * df['close'].shift(-1).rolling(window=5, min_periods=1).min() / df['close'] - 100
     df = df[df['5_day_max_return'] > -50]
     df = df[df['5_day_max_return'] < 50]
-    df['adx_bin'] = pd.cut(df['adx'], bins=10)
+    df = df[df['5_day_min_return'] > -50]
+    df = df[df['5_day_min_return'] < 50]
+    # Bin ADX values
+    df['adx_bin'] = pd.cut(df['adx'], bins=20)
 
-    # Calculate mean, variance, and count for each ADX bin
-    adx_summary = df.groupby('adx_bin')['5_day_max_return'].agg(mean='mean', var='var', count='count')  # Corrected line
+    # Calculate mean for max and min returns for each ADX bin
+    adx_summary = df.groupby('adx_bin')[['5_day_max_return', '5_day_min_return']].agg(['mean', 'var'])
 
     # Plot the graph
-    plt.figure(figsize=(10, 6))
-    error_bars = plt.errorbar(x=adx_summary.index.astype(str), y=adx_summary['mean'], yerr=np.sqrt(adx_summary['var']), fmt='o')
-    plt.xlabel('ADX')
-    plt.ylabel('Max 5-Day Return')
-    plt.title('Max 5-Day Return by ADX')
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Plot max return
+    ax.plot(adx_summary.index.astype(str), adx_summary['5_day_max_return']['mean'], marker='o', color='blue', label='Max 5-Day Return')
+    ax.bar(adx_summary.index.astype(str), adx_summary['5_day_max_return']['var'], alpha=0.2, color='blue') # 분산 바 플롯
+    
+    # Plot min return
+    ax.plot(adx_summary.index.astype(str), adx_summary['5_day_min_return']['mean'], marker='o', color='red', label='Min 5-Day Return')
+    ax.bar(adx_summary.index.astype(str), adx_summary['5_day_min_return']['var'], alpha=0.2, color='red') # 분산 바 플롯
+
+    ax.set_xlabel('ADX')
+    ax.set_ylabel('5-Day Return (%)')
+    ax.set_title('Max and Min 5-Day Return by ADX')
     plt.xticks(rotation=45)
+    plt.legend()
 
-    # Annotate with sample size
-    for i, count in enumerate(adx_summary['count']):  # Corrected line
-        x = error_bars.lines[0].get_xdata()[i]
-        y = error_bars.lines[0].get_ydata()[i]
-        plt.annotate(f'n={count}', (x, y), xytext=(5, 5), textcoords='offset points', fontsize=9, color='blue')
-
-    # plt.show()
     streamlit.pyplot(plt)
