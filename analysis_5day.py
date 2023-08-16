@@ -42,10 +42,7 @@ def calculate_frequency(df):
     frequency_table = pd.pivot_table(heatmap_data, index='y_bin', columns='x_bin', values='max_return_next_5_days', aggfunc='count', fill_value=0)
     return frequency_table
 
-def doit(remote):
-    # Read the DataFrame from the SQLite database
-    df = load_db.load_data(remote)
-
+def doit(df):
     frequency_table = calculate_frequency(df)
 
     # 히트맵 그리기
@@ -59,6 +56,3 @@ def doit(remote):
 
     # Streamlit에 플롯 출력
     st.pyplot(plt)
-
-if __name__ == "__main__":
-    doit(False)
