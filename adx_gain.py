@@ -26,20 +26,21 @@ def plot_adx_vs_5day_return(df):
     adx_summary = df.groupby('adx_bin')[['5_day_max_return', '5_day_min_return']].agg(['mean', 'var'])
 
     # Plot the graph
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax1 = plt.subplots(figsize=(10, 6))
 
-    # Plot max return
-    ax.plot(adx_summary.index.astype(str), adx_summary['5_day_max_return']['mean'], marker='o', color='blue', label='Max 5-Day Return')
-    ax.bar(adx_summary.index.astype(str), adx_summary['5_day_max_return']['var'], alpha=0.2, color='blue') # 분산 바 플롯
-    
-    # Plot min return
-    ax.plot(adx_summary.index.astype(str), adx_summary['5_day_min_return']['mean'], marker='o', color='red', label='Min 5-Day Return')
-    ax.bar(adx_summary.index.astype(str), adx_summary['5_day_min_return']['var'], alpha=0.2, color='red') # 분산 바 플롯
-
-    ax.set_xlabel('ADX')
-    ax.set_ylabel('5-Day Return (%)')
-    ax.set_title('Max and Min 5-Day Return by ADX')
+    # Plot mean (max and min return) on the primary y-axis
+    ax1.plot(adx_summary.index.astype(str), adx_summary['5_day_max_return']['mean'], marker='o', color='blue', label='Mean Max 5-Day Return')
+    ax1.plot(adx_summary.index.astype(str), adx_summary['5_day_min_return']['mean'], marker='o', color='red', label='Mean Min 5-Day Return')
+    ax1.set_xlabel('ADX')
+    ax1.set_ylabel('Mean 5-Day Return (%)')
+    ax1.legend(loc='upper left')
+    ax1.set_title('Max and Min 5-Day Return by ADX')
     plt.xticks(rotation=45)
-    plt.legend()
+
+    # Create a secondary y-axis to plot variance
+    ax2 = ax1.twinx()
+    ax2.bar(adx_summary.index.astype(str), adx_summary['5_day_max_return']['var'], alpha=0.2, color='blue') # 분산 바 플롯 (Max Return)
+    ax2.bar(adx_summary.index.astype(str), adx_summary['5_day_min_return']['var'], alpha=0.2, color='red') # 분산 바 플롯 (Min Return)
+    ax2.set_ylabel('Variance of 5-Day Return')
 
     streamlit.pyplot(plt)
