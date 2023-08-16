@@ -8,3 +8,5 @@ pykrx
 seaborn
 streamlit
 TA-lib
+pip>=23.2.1
+setuptools>=23.2.1
