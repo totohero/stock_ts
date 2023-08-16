@@ -5,7 +5,6 @@ import streamlit as st
 
 db_paths = [ 'KOSPI_stock_prices.feather', 'KOSDAQ_stock_prices.feather']
 
-@st.cache_data
 def load_data(remote=False):
     all_df = pd.DataFrame()
     for db_path in db_paths:
