@@ -12,10 +12,6 @@ st.sidebar.title("Choose action:")
 remote = st.sidebar.checkbox('Load db from remote')
 df = load_db.load_data(remote)
 
-use_filter1 = st.sidebar.checkbox('Filter 1 (rsi > 70 && macd osc > 0)')
-if use_filter1:
-    df = filter1.filter_stocks(df)
-
 try:    
     if st.sidebar.button("1 Day Analysis"):
         analysis_1day.doit(df)
